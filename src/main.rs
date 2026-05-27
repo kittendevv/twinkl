@@ -190,6 +190,19 @@ fn build_ui(app: &Application) {
     });
     search_bar.add_controller(focus_controller);
 
+    let apps_clone = apps.clone();
+    let window_clone = window.clone();
+    listbox.connect_row_activated(move |_, row| {
+        let index = row.index() as usize;
+        if let Some(app) = apps_clone.get(index) {
+            let _ = std::process::Command::new("sh")
+                .arg("-c")
+                .arg(&app.exec)
+                .spawn();
+            window_clone.close();
+        }
+    });
+
     let window_clone2 = window.clone();
     let search_key_controller = EventControllerKey::new();
     search_key_controller.connect_key_pressed(move |_, key, _, _| {
@@ -210,6 +223,7 @@ fn build_ui(app: &Application) {
     window.present();
 }
 
+#[derive(Clone)]
 struct AppEntry {
     name: String,
     exec: String,
