@@ -1,7 +1,7 @@
 use gtk4::prelude::*;
 use gtk4::{
-    Application, ApplicationWindow, Box as GtkBox, EventControllerKey, Image, Label, ListBox,
-    ListBoxRow, Orientation, ScrolledWindow, SearchEntry, glib,
+    Application, ApplicationWindow, Box as GtkBox, CssProvider, EventControllerKey, Image, Label,
+    ListBox, ListBoxRow, Orientation, ScrolledWindow, SearchEntry, glib,
 };
 use gtk4_layer_shell::{Layer, LayerShell};
 use std::fs;
@@ -9,6 +9,8 @@ use std::fs;
 use gtk4::EventControllerFocus;
 use std::cell::RefCell;
 use std::rc::Rc;
+
+use freedesktop_file_parser::{EntryType, parse};
 
 const APP_ID: &str = "dev.codingkittend.twinkl";
 
@@ -18,7 +20,66 @@ fn main() -> glib::ExitCode {
     app.run()
 }
 
+fn load_css() {
+    let provider = CssProvider::new();
+    provider.load_from_string(
+        "
+        entry {
+            background-color: #1e1e2e;
+            color: #cdd6f4;
+            border: 1px solid #45475a;
+            border-radius: 8px;
+            box-shadow: none;
+            outline: none;
+        }
+
+        entry:focus, entry:focus-within {
+            border-color: #cdd6f4;
+            box-shadow: none;
+            outline: none;
+        }
+        image {
+            color: #cdd6f4;
+        }
+        window {
+            background: transparent;
+        }
+        .launcher {
+            background-color: #1e1e2e;
+            border-radius: 12px;
+            padding: 8px;
+        }
+        list {
+            background: transparent;
+        }
+        row {
+            border-radius: 8px;
+            padding: 4px;
+        }
+        row:selected {
+            background-color: #45475a;
+            outline: none;
+        }
+        row:hover {
+            color: #cdd6f4;
+            outline: none;
+        }
+        label {
+            color: #cdd6f4;
+        }
+    ",
+    );
+
+    gtk4::style_context_add_provider_for_display(
+        &gtk4::gdk::Display::default().unwrap(),
+        &provider,
+        gtk4::STYLE_PROVIDER_PRIORITY_APPLICATION,
+    );
+}
+
 fn build_ui(app: &Application) {
+    load_css();
+
     let search_bar = SearchEntry::builder().build();
 
     let listbox = ListBox::builder().build();
@@ -68,8 +129,7 @@ fn build_ui(app: &Application) {
         .build();
 
     let scrollable = ScrolledWindow::builder()
-        .kinetic_scrolling(true)
-        .min_content_width(300)
+        .min_content_width(500)
         .min_content_height(300)
         .child(&listbox)
         .build();
@@ -79,6 +139,7 @@ fn build_ui(app: &Application) {
 
     let window = ApplicationWindow::builder()
         .application(app)
+        .decorated(false)
         .title("twinkl")
         .child(&vbox)
         .build();
@@ -139,6 +200,8 @@ fn build_ui(app: &Application) {
     });
     search_bar.add_controller(search_key_controller);
 
+    vbox.add_css_class("launcher");
+
     window.init_layer_shell();
     window.set_layer(Layer::Overlay);
     window.set_keyboard_mode(gtk4_layer_shell::KeyboardMode::Exclusive);
@@ -155,48 +218,44 @@ struct AppEntry {
 
 fn parse_apps() -> Vec<AppEntry> {
     let mut apps = Vec::new();
-
     let dirs = fs::read_dir("/usr/share/applications").unwrap();
 
     for entry in dirs {
         let path = entry.unwrap().path();
         if path.extension().and_then(|e| e.to_str()) != Some("desktop") {
-            continue; // skip non-.desktop files
+            continue;
         }
 
-        let contents = fs::read_to_string(&path).unwrap();
-        let mut name = None;
-        let mut exec = None;
-        let mut icon = None;
+        let contents = match fs::read_to_string(&path) {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
 
-        for line in contents.lines() {
-            if line.starts_with('#') || line.starts_with('[') {
-                continue; // skip comments and section headers like [Desktop Entry]
-            }
-            if let Some((key, value)) = line.split_once('=') {
-                match key.trim() {
-                    "Name" => name = Some(value.trim().to_string()),
-                    "Exec" => {
-                        exec = Some(
-                            value
-                                .trim()
-                                .replace("%u", "")
-                                .replace("%f", "")
-                                .replace("%U", "")
-                                .replace("%F", "")
-                                .trim()
-                                .to_string(),
-                        )
-                    }
-                    "Icon" => icon = Some(value.trim().to_string()),
-                    _ => {} // ignore everything else
-                }
-            }
-        }
+        let desktop_file = match parse(&contents) {
+            Ok(d) => d,
+            Err(_) => continue,
+        };
 
-        if let (Some(name), Some(exec)) = (name, exec) {
-            apps.push(AppEntry { name, exec, icon });
+        // skip non-application entries (e.g. links, directories)
+        let exec = if let EntryType::Application(app) = &desktop_file.entry.entry_type {
+            app.exec.clone()
+        } else {
+            continue;
+        };
+
+        let name = desktop_file.entry.name.default.clone();
+        if desktop_file.entry.no_display.unwrap_or(false)
+            || desktop_file.entry.hidden.unwrap_or(false)
+        {
+            continue;
         }
+        let icon = desktop_file.entry.icon.as_ref().map(|i| i.content.clone());
+
+        apps.push(AppEntry {
+            name,
+            exec: exec.unwrap_or_default(),
+            icon,
+        });
     }
 
     apps
