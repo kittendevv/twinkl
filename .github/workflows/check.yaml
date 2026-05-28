@@ -12,31 +12,22 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    container: archlinux:latest
     steps:
       - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libgtk-4-dev \
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm \
+            rust \
+            gtk4 \
+            gtk4-layer-shell \
             pkg-config \
-            meson \
-            ninja-build \
-            libwayland-dev \
-            wayland-protocols
-
-      - name: Build gtk4-layer-shell
-        run: |
-          git clone https://github.com/wmww/gtk4-layer-shell.git
-          cd gtk4-layer-shell
-          meson setup build -Dexamples=false -Ddocs=false -Dtests=false
-          ninja -C build
-          sudo ninja -C build install
-          sudo ldconfig
+            base-devel
 
       - name: Build
         run: cargo build --verbose
+
       - name: Run tests
         run: cargo test --verbose
