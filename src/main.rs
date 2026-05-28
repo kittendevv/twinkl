@@ -22,53 +22,75 @@ fn main() -> glib::ExitCode {
 
 fn load_css() {
     let provider = CssProvider::new();
-    provider.load_from_string(
-        "
-        entry {
-            background-color: #1e1e2e;
-            color: #cdd6f4;
-            border: 1px solid #45475a;
-            border-radius: 8px;
-            box-shadow: none;
-            outline: none;
-        }
 
-        entry:focus, entry:focus-within {
-            border-color: #cdd6f4;
-            box-shadow: none;
-            outline: none;
-        }
-        image {
-            color: #cdd6f4;
-        }
-        window {
-            background: transparent;
-        }
-        .launcher {
-            background-color: #1e1e2e;
-            border-radius: 12px;
-            padding: 8px;
-        }
-        list {
-            background: transparent;
-        }
-        row {
-            border-radius: 8px;
-            padding: 4px;
-        }
-        row:selected {
-            background-color: #45475a;
-            outline: none;
-        }
-        row:hover {
-            color: #cdd6f4;
-            outline: none;
-        }
-        label {
-            color: #cdd6f4;
-        }
-    ",
-    );
+    let css_path = dirs::config_dir().unwrap().join("twinkl").join("style.css");
+
+    if css_path.exists() {
+        provider.load_from_path(css_path);
+    } else {
+        // fallback hardcoded style
+        provider.load_from_string(
+            "
+            entry,
+            entry text,
+            entry undershoot.left,
+            entry undershoot.right {
+                background-color: #011936;
+                color: #D9F0FF;
+                border: none;1
+                box-shadow: none;
+                outline: none;
+            }
+
+            entry:focus,
+            entry:focus-within {
+               	box-shadow: none;
+               	outline: none;
+            }
+
+            image {
+                color: #D9F0FF;
+            }
+
+            window {
+                background: transparent;
+            }
+
+            .launcher {
+               	background-color: #011936;
+               	border-radius: 12px;
+               	padding: 8px;
+            }
+
+            list {
+           	    background: transparent;
+            }
+
+            row {
+                border-radius: 8px;
+                padding: 4px;
+            }
+
+            row:selected {
+                background-color: #A3D5FF;
+                outline: none;
+            }
+
+            row:hover {
+                color: #A3D5FF;
+                outline: none;
+            }
+
+            row:selected label {
+                color: #011936;
+            }
+
+            label {
+                color: #D9F0FF;
+            }
+        ",
+        );
+    }
 
     gtk4::style_context_add_provider_for_display(
         &gtk4::gdk::Display::default().unwrap(),
@@ -232,44 +254,55 @@ struct AppEntry {
 
 fn parse_apps() -> Vec<AppEntry> {
     let mut apps = Vec::new();
-    let dirs = fs::read_dir("/usr/share/applications").unwrap();
 
-    for entry in dirs {
-        let path = entry.unwrap().path();
-        if path.extension().and_then(|e| e.to_str()) != Some("desktop") {
-            continue;
+    let mut dirs = vec![std::path::PathBuf::from("/usr/share/applications")];
+    if let Some(home) = std::env::var_os("HOME") {
+        dirs.push(std::path::PathBuf::from(home).join(".local/share/applications"));
+    }
+
+    for dir in dirs {
+        let entries = match fs::read_dir(dir) {
+            Ok(e) => e,
+            Err(_) => continue, // skip if dir doesn't exist
+        };
+
+        for entry in entries {
+            let path = entry.unwrap().path();
+            if path.extension().and_then(|e| e.to_str()) != Some("desktop") {
+                continue;
+            }
+
+            let contents = match fs::read_to_string(&path) {
+                Ok(c) => c,
+                Err(_) => continue,
+            };
+
+            let desktop_file = match parse(&contents) {
+                Ok(d) => d,
+                Err(_) => continue,
+            };
+
+            // skip non-application entries (e.g. links, directories)
+            let exec = if let EntryType::Application(app) = &desktop_file.entry.entry_type {
+                app.exec.clone()
+            } else {
+                continue;
+            };
+
+            let name = desktop_file.entry.name.default.clone();
+            if desktop_file.entry.no_display.unwrap_or(false)
+                || desktop_file.entry.hidden.unwrap_or(false)
+            {
+                continue;
+            }
+            let icon = desktop_file.entry.icon.as_ref().map(|i| i.content.clone());
+
+            apps.push(AppEntry {
+                name,
+                exec: exec.unwrap_or_default(),
+                icon,
+            });
         }
-
-        let contents = match fs::read_to_string(&path) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
-
-        let desktop_file = match parse(&contents) {
-            Ok(d) => d,
-            Err(_) => continue,
-        };
-
-        // skip non-application entries (e.g. links, directories)
-        let exec = if let EntryType::Application(app) = &desktop_file.entry.entry_type {
-            app.exec.clone()
-        } else {
-            continue;
-        };
-
-        let name = desktop_file.entry.name.default.clone();
-        if desktop_file.entry.no_display.unwrap_or(false)
-            || desktop_file.entry.hidden.unwrap_or(false)
-        {
-            continue;
-        }
-        let icon = desktop_file.entry.icon.as_ref().map(|i| i.content.clone());
-
-        apps.push(AppEntry {
-            name,
-            exec: exec.unwrap_or_default(),
-            icon,
-        });
     }
 
     apps

@@ -1,0 +1,57 @@
+entry,
+entry text,
+entry undershoot.left,
+entry undershoot.right {
+    background-color: {{ base16.base00.default.hex }};
+    color: {{ colors.on_background.default.hex }};
+    border: none;
+    box-shadow: none;
+    outline: none;
+}
+
+entry:focus,
+entry:focus-within {
+	box-shadow: none;
+	outline: none;
+}
+
+image {
+	color: {{ colors.on_background.default.hex }};
+}
+
+window {
+	background: transparent;
+}
+
+.launcher {
+	background-color: {{ base16.base00.default.hex }};
+	border-radius: 12px;
+	padding: 8px;
+}
+
+list {
+	background: transparent;
+}
+
+row {
+	border-radius: 8px;
+	padding: 4px;
+}
+
+row:selected {
+	background-color: {{ colors.primary.default.hex }};
+	outline: none;
+}
+
+row:hover {
+	color: {{ colors.primary.default.hex }};
+	outline: none;
+}
+
+row:selected label {
+    color: {{ colors.on_primary.default.hex }};
+}
+
+label {
+	color: {{ colors.on_background.default.hex }};
+}

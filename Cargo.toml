@@ -7,3 +7,4 @@ edition = "2024"
 gtk4 = { version = "0.9", features = ["v4_12"] }
 gtk4-layer-shell = "0.4"
 freedesktop-file-parser = "0.3.0"
+dirs = "5"

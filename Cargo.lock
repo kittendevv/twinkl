@@ -855,6 +855,7 @@ dependencies = [
 name = "twinkl"
 version = "0.1.0"
 dependencies = [
+ "dirs",
  "freedesktop-file-parser",
  "gtk4",
  "gtk4-layer-shell",

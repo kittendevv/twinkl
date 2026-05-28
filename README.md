@@ -1,0 +1,3 @@
+# twinkl
+
+Twinkl is my take on an app launcher for linux, this is my first ever rust project. If you want to keep your sanity I would not reccomend looking in the actual code...
