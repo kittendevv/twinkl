@@ -8,21 +8,30 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  release:
-    name: Create Release
+  build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
+    container: archlinux:latest
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libgtk-4-dev \
-            libgtk4-layer-shell-dev \
-            pkg-config
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm \
+            rust \
+            gtk4 \
+            gtk4-layer-shell \
+            pkg-config \
+            base-devel
 
       - name: Build release binary
         run: cargo build --release --verbose
