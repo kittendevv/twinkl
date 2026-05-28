@@ -284,7 +284,17 @@ fn parse_apps() -> Vec<AppEntry> {
 
             // skip non-application entries (e.g. links, directories)
             let exec = if let EntryType::Application(app) = &desktop_file.entry.entry_type {
-                app.exec.clone()
+                app.exec.clone().map(|e| {
+                    e.replace("%u", "")
+                        .replace("%f", "")
+                        .replace("%U", "")
+                        .replace("%F", "")
+                        .replace("%i", "")
+                        .replace("%c", "")
+                        .replace("%k", "")
+                        .trim()
+                        .to_string()
+                })
             } else {
                 continue;
             };
