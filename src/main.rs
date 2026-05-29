@@ -7,6 +7,7 @@ use gtk4_layer_shell::{Layer, LayerShell};
 use std::fs;
 
 use gtk4::EventControllerFocus;
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -106,7 +107,17 @@ fn build_ui(app: &Application) {
 
     let listbox = ListBox::builder().build();
 
-    let apps = parse_apps();
+    let apps = load_cache().unwrap_or_else(|| {
+        let apps = parse_apps();
+        save_cache(&apps);
+        apps
+    });
+
+    // refresh cache in background for next launch
+    std::thread::spawn(|| {
+        let apps = parse_apps();
+        save_cache(&apps);
+    });
 
     for entry in &apps {
         let hbox = GtkBox::builder()
@@ -245,7 +256,7 @@ fn build_ui(app: &Application) {
     window.present();
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize, Deserialize)]
 struct AppEntry {
     name: String,
     exec: String,
@@ -316,4 +327,21 @@ fn parse_apps() -> Vec<AppEntry> {
     }
 
     apps
+}
+
+fn cache_path() -> std::path::PathBuf {
+    dirs::cache_dir().unwrap().join("twinkl").join("apps.json")
+}
+
+fn load_cache() -> Option<Vec<AppEntry>> {
+    let contents = fs::read_to_string(cache_path()).ok()?;
+    serde_json::from_str(&contents).ok()
+}
+
+fn save_cache(apps: &Vec<AppEntry>) {
+    let path = cache_path();
+    fs::create_dir_all(path.parent().unwrap()).ok();
+    if let Ok(json) = serde_json::to_string(apps) {
+        fs::write(path, json).ok();
+    }
 }
