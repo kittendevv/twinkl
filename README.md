@@ -6,5 +6,5 @@ Twinkl is my take on an app launcher for linux, this is my first ever rust proje
 
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kittendevv/blindspot/refs/heads/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/kittendevv/twinkl/refs/heads/main/install.sh | bash
 ```
